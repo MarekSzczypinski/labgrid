@@ -3,7 +3,7 @@
 import asyncio
 import os
 
-from kasa import Credentials, DeviceConfig, DeviceConnectionParameters, DeviceEncryptionType, DeviceFamily, Device
+from kasa import Credentials, Device, DeviceConfig, DeviceConnectionParameters, DeviceEncryptionType, DeviceFamily
 
 
 def _get_credentials() -> Credentials:
