@@ -300,7 +300,7 @@ class TestNetworkPowerDriver:
         import labgrid.driver.power.tplink
 
     def test_import_backend_tapo(self):
-        pytest.importskip("kasa")
+        pytest.importorskip("kasa")
         import labgrid.driver.power.tapo
 
     def test_import_backend_siglent(self):
