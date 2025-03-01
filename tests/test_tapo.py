@@ -8,13 +8,20 @@ from labgrid.driver.power.tapo import _get_credentials, _power_get, _power_set, 
 
 # Mock device configuration
 @pytest.fixture
-def mock_device():
+def mock_device_strip():
     device = AsyncMock()
     device.children = [
         AsyncMock(is_on=True),
         AsyncMock(is_on=False),
         AsyncMock(is_on=True)
     ]
+    return device
+
+
+@pytest.fixture
+def mock_single_plug():
+    device = AsyncMock()
+    device.children = []
     return device
 
 
@@ -51,9 +58,38 @@ class TestTapoPowerDriver:
         assert creds.password == 'test_pass'
 
     @pytest.mark.asyncio
-    async def test_power_get(self, mock_device, mock_env):
+    async def test_power_get_single_plug(self, mock_single_plug, mock_env):
+        """Test power state retrieval for single plug device"""
+        mock_single_plug.is_on = True  # Set the power state for single plug
+
+        with patch('kasa.Device.connect', return_value=mock_single_plug):
+            # Test single plug state (on)
+            result = await _power_get('192.168.1.100', None, 0)
+            assert result is True
+
+            # Test after changing state
+            # Change index to show it's ignored for signle plug
+            mock_single_plug.is_on = False
+            result = await _power_get('192.168.1.100', None, 5)
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_power_set_single_plug(self, mock_single_plug, mock_env):
+        """Test power state setting for single plug device"""
+        with patch('kasa.Device.connect', return_value=mock_single_plug):
+            # Test turning single plug on
+            await _power_set('192.168.1.100', None, 0, True)
+            mock_single_plug.turn_on.assert_called_once()
+
+            # Test turning single plug off
+            # Change index to show it's ignored for signle plug
+            await _power_set('192.168.1.100', None, 1, False)
+            mock_single_plug.turn_off.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_power_get(self, mock_device_strip, mock_env):
         """Test power state retrieval"""
-        with patch('kasa.Device.connect', return_value=mock_device):
+        with patch('kasa.Device.connect', return_value=mock_device_strip):
             # Test first outlet (on)
             result = await _power_get('192.168.1.100', None, 0)  # Use _power_get directly
             assert result is True
@@ -63,25 +99,25 @@ class TestTapoPowerDriver:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_power_set(self, mock_device, mock_env):
+    async def test_power_set(self, mock_device_strip, mock_env):
         """Test power state setting"""
-        with patch('kasa.Device.connect', return_value=mock_device):
+        with patch('kasa.Device.connect', return_value=mock_device_strip):
             # Test turning outlet on
             await _power_set('192.168.1.100', None, 0, True)
-            mock_device.children[0].turn_on.assert_called_once()
+            mock_device_strip.children[0].turn_on.assert_called_once()
 
             # Test turning outlet off
             await _power_set('192.168.1.100', None, 1, False)
-            mock_device.children[1].turn_off.assert_called_once()
+            mock_device_strip.children[1].turn_off.assert_called_once()
 
-    def test_invalid_index(self, mock_device, mock_env):
+    def test_invalid_index(self, mock_device_strip, mock_env):
         """Test accessing invalid outlet index"""
-        with patch('kasa.Device.connect', return_value=mock_device):
+        with patch('kasa.Device.connect', return_value=mock_device_strip):
             with pytest.raises(AssertionError, match="Trying to access non-existant plug socket"):
                 power_get('192.168.1.100', None, 5)
 
-    def test_invalid_port(self, mock_device):
+    def test_invalid_port(self, mock_device_strip):
         """Test that non-None port raises AssertionError"""
-        with patch('kasa.Device.connect', return_value=mock_device):
+        with patch('kasa.Device.connect', return_value=mock_device_strip):
             with pytest.raises(AssertionError):
                 power_get('192.168.1.100', '8080', 0)

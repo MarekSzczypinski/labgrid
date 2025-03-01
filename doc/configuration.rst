@@ -244,8 +244,12 @@ Currently available are:
   <https://github.com/python-kasa/python-kasa>`_.
 
 ``tapo``
-  Controls *Tapo power strips* via `python-kasa
-  <https://github.com/python-kasa/python-kasa/tree/0.7.7>`_.
+  Controls *Tapo power strips and single socket devices* via `python-kasa
+  <https://github.com/python-kasa/python-kasa>`_.
+  Requires valid TP-Link/TAPO cloud credentials to work.
+  See the `docstring in the module
+  <https://github.com/MarekSzczypinski/labgrid/blob/master/labgrid/driver/power/tapo.py>`__
+  for details.
 
 ``tinycontrol``
   Controls a tinycontrol.eu IP Power Socket via HTTP.
