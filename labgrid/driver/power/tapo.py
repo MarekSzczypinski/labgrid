@@ -61,7 +61,7 @@ def power_set(host: str, port: str, index: str, value: bool) -> None:
     asyncio.run(_power_set(host, port, index, value))
 
 
-async def _power_get(host: str, port: str, index) -> bool:
+async def _power_get(host: str, port: str, index: str) -> bool:
     assert port is None
     index = int(index)
     device = await Device.connect(
@@ -82,5 +82,5 @@ async def _power_get(host: str, port: str, index) -> bool:
     return pwr_state
 
 
-def power_get(host: str, port: str, index) -> bool:
+def power_get(host: str, port: str, index: str) -> bool:
     return asyncio.run(_power_get(host, port, index))
