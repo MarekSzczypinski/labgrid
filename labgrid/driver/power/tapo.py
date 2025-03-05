@@ -22,7 +22,7 @@ def _get_credentials() -> Credentials:
     username = os.environ.get("KASA_USERNAME")
     password = os.environ.get("KASA_PASSWORD")
     if username is None or password is None:
-        raise ValueError("Set KASA_USERNAME and KASA_PASSWORD environment variables")
+        raise EnvironmentError("KASA_USERNAME or KASA_PASSWORD environment variable not set")
     return Credentials(username=username, password=password)
 
 
