@@ -48,9 +48,7 @@ def _get_connection_type() -> DeviceConnectionParameters:
 
 
 def _get_device_config(host: str) -> DeviceConfig:
-    # Somewhere between python-kasa 0.7.7 and 0.10.2 the API changed
-    # Labgrid on Python <= 3.10 uses python-kasa 0.7.7
-    # Labgrid on Python >= 3.11 uses python-kasa 0.10.2
+    # Same as with `_get_connection_type` - python-kasa API changed
     if sys.version_info < (3, 11):
         return DeviceConfig(
             host=host, credentials=_get_credentials(), connection_type=_get_connection_type(), uses_http=True
