@@ -40,7 +40,7 @@ class TestTapoPowerDriver:
         saved_password = os.environ.pop('KASA_PASSWORD', None)
 
         try:
-            with pytest.raises(EnvironmentError, match="KASA_USERNAME or KASA_PASSWORD environment variables not set"):
+            with pytest.raises(EnvironmentError, match="KASA_USERNAME or KASA_PASSWORD environment variable not set"):
                 _get_credentials()
         finally:
             # Restore environment variables if they existed

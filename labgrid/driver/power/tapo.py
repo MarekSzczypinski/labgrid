@@ -14,6 +14,7 @@ Requirements:
 
 import asyncio
 import os
+import sys
 
 from kasa import Credentials, Device, DeviceConfig, DeviceConnectionParameters, DeviceEncryptionType, DeviceFamily
 
@@ -27,11 +28,35 @@ def _get_credentials() -> Credentials:
 
 
 def _get_connection_type() -> DeviceConnectionParameters:
+    # Somewhere between python-kasa 0.7.7 and 0.10.2 the API changed
+    # Labgrid on Python <= 3.10 uses python-kasa 0.7.7
+    # Labgrid on Python >= 3.11 uses python-kasa 0.10.2
+    if sys.version_info < (3, 11):
+        return DeviceConnectionParameters(
+            device_family=DeviceFamily.SmartTapoPlug,
+            encryption_type=DeviceEncryptionType.Klap,
+            https=False,
+            login_version=2,
+        )
     return DeviceConnectionParameters(
         device_family=DeviceFamily.SmartTapoPlug,
         encryption_type=DeviceEncryptionType.Klap,
         https=False,
         login_version=2,
+        http_port=80,
+    )
+
+
+def _get_device_config(host: str) -> DeviceConfig:
+    # Somewhere between python-kasa 0.7.7 and 0.10.2 the API changed
+    # Labgrid on Python <= 3.10 uses python-kasa 0.7.7
+    # Labgrid on Python >= 3.11 uses python-kasa 0.10.2
+    if sys.version_info < (3, 11):
+        return DeviceConfig(
+            host=host, credentials=_get_credentials(), connection_type=_get_connection_type(), uses_http=True
+        )
+    return DeviceConfig(
+        host=host, credentials=_get_credentials(), connection_type=_get_connection_type()
     )
 
 
@@ -39,11 +64,7 @@ async def _power_set(host: str, port: str, index: str, value: bool) -> None:
     """We embed the coroutines in an `async` function to minimise calls to `asyncio.run`"""
     assert port is None
     index = int(index)
-    device = await Device.connect(
-        config=DeviceConfig(
-            host=host, credentials=_get_credentials(), connection_type=_get_connection_type(), uses_http=True
-        )
-    )
+    device = await Device.connect(config=_get_device_config(host))
     await device.update()
 
     if device.children:
@@ -64,11 +85,7 @@ def power_set(host: str, port: str, index: str, value: bool) -> None:
 async def _power_get(host: str, port: str, index: str) -> bool:
     assert port is None
     index = int(index)
-    device = await Device.connect(
-        config=DeviceConfig(
-            host=host, credentials=_get_credentials(), connection_type=_get_connection_type(), uses_http=True
-        )
-    )
+    device = await Device.connect(config=_get_device_config(host))
     await device.update()
 
     pwr_state: bool
