@@ -248,7 +248,7 @@ Currently available are:
   <https://github.com/python-kasa/python-kasa>`_.
   Requires valid TP-Link/TAPO cloud credentials to work.
   See the `docstring in the module
-  <https://github.com/MarekSzczypinski/labgrid/blob/master/labgrid/driver/power/tapo.py>`__
+  <https://github.com/labgrid-project/labgrid/blob/master/labgrid/driver/power/tapo.py>`__
   for details.
 
 ``tinycontrol``
