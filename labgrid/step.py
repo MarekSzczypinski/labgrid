@@ -227,6 +227,9 @@ def step(*, title=None, args=[], result=False, tag=None):
                 step.stop()
             return _result
 
+        wrapper.__signature__ = signature.replace(
+            parameters=[p for p in signature.parameters.values() if p.name != "step"]
+        )
         return wrapper
 
     return decorator
