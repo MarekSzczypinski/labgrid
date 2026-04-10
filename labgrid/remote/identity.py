@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from labgrid.remote.common import get_metadata_single_value_by_key
@@ -26,19 +27,28 @@ class ClientIdentity:
 
         Returns:
             A ClientIdentity with id set to ``hostname/username`` (or just
-            ``hostname`` if no username is present) and (optional) user_agent.
-
-        Raises:
-            NoIdentityPresent: If the hostname key is missing from metadata.
+            ``hostname`` if no username is present) and (optional) user_agent
+            or None if no metadata is supplied.
         """
         username = get_metadata_single_value_by_key(metadata, USERNAME_KEY)
         hostname = get_metadata_single_value_by_key(metadata, HOSTNAME_KEY)
         user_agent = get_metadata_single_value_by_key(metadata, USER_AGENT_KEY)
 
         if not hostname:
-            raise NoIdentityPresent()
+            return None
 
         if username:
             return cls(f"{hostname}/{username}", user_agent)
 
         return cls(hostname, user_agent)
+
+
+def infer_peer_identity(clients, context, identity):
+    logger = logging.getLogger("infer_peer_identity")
+
+    if identity:
+        logger.debug("identity sourced from metadata")
+        return identity.id
+
+    logger.debug("identity sourced from self.clients")
+    return clients[context.peer()].name
