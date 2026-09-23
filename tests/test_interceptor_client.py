@@ -5,7 +5,7 @@ from labgrid.remote.grpc.interceptor.client import (
     IdentityClientUnaryUnaryInterceptor,
     IdentityClientStreamStreamInterceptor,
 )
-from labgrid.remote.identity import USERNAME_KEY, HOSTNAME_KEY, USER_AGENT_KEY
+from labgrid.remote.identity import NAME_KEY, HOSTNAME_KEY, USER_AGENT_KEY
 
 
 class DummyMetadata:
@@ -33,7 +33,7 @@ def test_base_identity_client_interceptor_injects_all_fields():
     interceptor._inject(client_call_details)
 
     assert client_call_details.metadata.items == [
-        (USERNAME_KEY, "test_username"),
+        (NAME_KEY, "test_username"),
         (HOSTNAME_KEY, "test_hostname"),
         (USER_AGENT_KEY, "test_agent"),
     ]
@@ -67,7 +67,7 @@ async def test_client_interceptor_implementations(impl, method):
     assert result is sentinel_response
     assert received["ccd"] is client_call_details
     assert client_call_details.metadata.items == [
-        (USERNAME_KEY, "test_username"),
+        (NAME_KEY, "test_username"),
         (HOSTNAME_KEY, "test_hostname"),
         (USER_AGENT_KEY, "test_agent"),
     ]

@@ -2,7 +2,7 @@ from typing import Optional
 
 from grpc.aio import ClientCallDetails, ClientInterceptor, StreamStreamClientInterceptor, UnaryUnaryClientInterceptor
 
-from labgrid.remote.identity import HOSTNAME_KEY, USER_AGENT_KEY, USERNAME_KEY
+from labgrid.remote.identity import HOSTNAME_KEY, USER_AGENT_KEY, NAME_KEY
 
 
 class BaseIdentityClientInterceptor(ClientInterceptor):
@@ -14,7 +14,7 @@ class BaseIdentityClientInterceptor(ClientInterceptor):
 
     def _inject(self, client_call_details: ClientCallDetails):
         if self.username:
-            client_call_details.metadata.add(USERNAME_KEY, self.username)
+            client_call_details.metadata.add(NAME_KEY, self.username)
         client_call_details.metadata.add(HOSTNAME_KEY, self.hostname)
         if self.user_agent:
             client_call_details.metadata.add(USER_AGENT_KEY, self.user_agent)

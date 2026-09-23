@@ -351,6 +351,8 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
                     elif kind == "startup":
                         if session:
                             logging.debug("ignoring legacy startup message from client %s", peer)
+                            name = session.name
+                            version = identity.user_agent
                             continue
                         name = in_msg.startup.name
                         version = in_msg.startup.version
@@ -462,6 +464,8 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
                     elif kind == "startup":
                         if session:
                             logging.debug("ignoring legacy startup message from exporter %s", peer)
+                            name = session.name
+                            version = identity.user_agent
                             continue
                         name = in_msg.startup.name
                         version = in_msg.startup.version
