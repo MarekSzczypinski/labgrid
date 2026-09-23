@@ -12,9 +12,12 @@ import random
 import signal
 import pathlib
 from typing import Optional
+
 import attr
 import grpc
 from grpc_reflection.v1alpha import reflection
+
+from labgrid.remote.identity import ClientIdentity, infer_peer_identity
 
 from .common import (
     ResourceEntry,
@@ -183,6 +186,15 @@ def locked(func):
     return wrapper
 
 
+def add_identity(func):
+    @wraps(func)
+    async def wrapper(self, request, context):
+        identity = ClientIdentity.from_metadata(context.invocation_metadata())
+        return await func(self, request, context, identity=identity)
+
+    return wrapper
+
+
 class ExporterCommand:
     def __init__(self, request) -> None:
         self.request = request
@@ -318,9 +330,15 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
         assert peer not in self.clients
         out_msg_queue = asyncio.Queue()
 
+        identity = ClientIdentity.from_metadata(context.invocation_metadata())
+        if identity:
+            logging.debug("client identity provided in gRPC metadata: %s", identity)
+            self.clients[peer] = ClientSession(self, peer, identity.id, out_msg_queue, identity.user_agent)
+
         async def request_task():
             name = None
             version = None
+            session = self.clients.get(peer)
             try:
                 async for in_msg in request_iterator:
                     in_msg: labgrid_coordinator_pb2.ClientInMessage
@@ -331,8 +349,17 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
                         out_msg.sync.id = in_msg.sync.id
                         out_msg_queue.put_nowait(out_msg)
                     elif kind == "startup":
-                        version = in_msg.startup.version
+                        if session:
+                            logging.debug("ignoring legacy startup message from client %s", peer)
+                            name = session.name
+                            version = identity.user_agent
+                            continue
                         name = in_msg.startup.name
+                        version = in_msg.startup.version
+                        logging.warning(
+                            "client %s did not provide identity metadata; using deprecated startup identity",
+                            peer,
+                        )
                         session = self.clients[peer] = ClientSession(self, peer, name, out_msg_queue, version)
                         logging.debug("Received startup from %s with %s", name, version)
                         asyncio.current_task().set_name(f"client-{peer}-rx/started-{name}")
@@ -410,9 +437,21 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
         out_msg.hello.version = labgrid_version()
         yield out_msg
 
+        identity = ClientIdentity.from_metadata(context.invocation_metadata())
+        if identity:
+            logging.debug("exporter identity provided in gRPC metadata: %s", identity)
+            if existing := self.get_exporter_by_name(identity.id):
+                await context.abort(
+                    grpc.StatusCode.ALREADY_EXISTS,
+                    f"startup failed: exporter with name '{identity.id}' is already connected from {existing.peer}",
+                )
+            self.exporters[peer] = ExporterSession(self, peer, identity.id, command_queue, identity.user_agent)
+            startup_done.set()
+
         async def request_task():
             name = None
             version = None
+            session = self.exporters.get(peer)
             try:
                 async for in_msg in request_iterator:
                     in_msg: labgrid_coordinator_pb2.ExporterInMessage
@@ -423,8 +462,17 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
                         cmd.complete(in_msg.response)
                         logging.debug("Command %s is done", cmd)
                     elif kind == "startup":
-                        version = in_msg.startup.version
+                        if session:
+                            logging.debug("ignoring legacy startup message from exporter %s", peer)
+                            name = session.name
+                            version = identity.user_agent
+                            continue
                         name = in_msg.startup.name
+                        version = in_msg.startup.version
+                        logging.warning(
+                            "exporter %s did not provide identity metadata; using deprecated startup identity",
+                            peer,
+                        )
                         if existing := self.get_exporter_by_name(name):
                             raise ExporterError(
                                 f"exporter with name '{name}' is already connected from {existing.peer}"
@@ -848,12 +896,13 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
             idx = place.acquired_resources.index(oldresource)
             place.acquired_resources[idx] = newresource
 
+    @add_identity
     @locked
-    async def AcquirePlace(self, request, context):
+    async def AcquirePlace(self, request, context, *, identity):
         peer = context.peer()
         name = request.placename
         try:
-            username = self.clients[peer].name
+            username = infer_peer_identity(self.clients, context, identity)
         except KeyError:
             await context.abort(grpc.StatusCode.FAILED_PRECONDITION, f"Peer {peer} does not have a valid session")
         print(request)
@@ -917,13 +966,14 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
         print(f"{place.name}: place released")
         return labgrid_coordinator_pb2.ReleasePlaceResponse()
 
+    @add_identity
     @locked
-    async def AllowPlace(self, request, context):
+    async def AllowPlace(self, request, context, *, identity):
         placename = request.placename
         user = request.user
         peer = context.peer()
         try:
-            username = self.clients[peer].name
+            username = infer_peer_identity(self.clients, context, identity)
         except KeyError:
             await context.abort(grpc.StatusCode.FAILED_PRECONDITION, f"Peer {peer} does not have a valid session")
         try:
@@ -1060,8 +1110,9 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
             if old_map.get(name) != new_map.get(name):
                 self._publish_place(self.places[name])
 
+    @add_identity
     @locked
-    async def CreateReservation(self, request: labgrid_coordinator_pb2.CreateReservationRequest, context):
+    async def CreateReservation(self, request: labgrid_coordinator_pb2.CreateReservationRequest, context, *, identity):
         peer = context.peer()
 
         fltrs = {}
@@ -1078,7 +1129,10 @@ class Coordinator(labgrid_coordinator_pb2_grpc.CoordinatorServicer):
                     await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Value {v} is invalid")
                 fltr[k] = v
 
-        owner = self.clients[peer].name
+        try:
+            owner = infer_peer_identity(self.clients, context, identity)
+        except KeyError:
+            await context.abort(grpc.StatusCode.FAILED_PRECONDITION, f"Peer {peer} does not have a valid session")
         res = Reservation(owner=owner, prio=request.prio, filters=fltrs)
         self.reservations[res.token] = res
         self.schedule_reservations()
